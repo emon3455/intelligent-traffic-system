@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Object Detection from Camera</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        video {
+            width: 600px;
+            height: 400px;
+            border: 2px solid black;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .error {
+            margin-top: 20px;
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-time Object Detection from Camera</h1>
+    <video id="video" autoplay></video><br>
+    <button id="start-detection">Start Object Detection</button>
+    <div class="result" id="result"></div>
+    <div class="error" id="error"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error');
+        const startButton = document.getElementById('start-detection');
+
+        // Request access to the camera and stream it to the video element
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (error) {
+                errorDiv.textContent = "Error accessing camera: " + error.message;
+            }
+        }
+
+        async function captureFrameAndDetectObjects() {
+            resultDiv.textContent = '';
+            errorDiv.textContent = '';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async function(blob) {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/upload-video/', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        resultDiv.textContent = `Total Objects Detected: ${data.total_object_count}`;
+                    } else {
+                        const errorData = await response.json();
+                        errorDiv.textContent = `Error: ${errorData.detail || 'Unable to detect objects.'}`;
+                    }
+                } catch (error) {
+                    errorDiv.textContent = `Error: ${error.message}`;
+                }
+            }, 'image/jpeg');
+        }
+
+        // Start the camera when the page loads
+        window.onload = startCamera;
+
+        // Start object detection when the button is clicked
+        startButton.addEventListener('click', captureFrameAndDetectObjects);
+    </script>
+</body>
+</html>

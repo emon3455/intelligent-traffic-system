@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Traffic System</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px;
+        }
+        #signal {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+        #videoContainer {
+            display: none;
+            margin-top: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Intelligent Traffic System</h1>
+
+    <div id="leftControl">
+        <button id="startLeft">Start Left Camera</button>
+        <button id="captureLeft" disabled>Capture Left Frame</button>
+    </div>
+
+    <div id="rightControl">
+        <button id="startRight">Start Right Camera</button>
+        <button id="captureRight" disabled>Capture Right Frame</button>
+    </div>
+
+    <div>
+        <button id="generateResult" disabled>Generate Result</button>
+    </div>
+
+    <div id="signal"></div>
+
+    <div id="videoContainer">
+        <video id="video" autoplay></video>
+    </div>
+
+    <script>
+        let leftImageFile = null;
+        let rightImageFile = null;
+        let currentSide = null;
+
+        // Start the camera for the left side
+        document.getElementById("startLeft").onclick = async function () {
+            currentSide = "left";
+            await startCamera();
+            document.getElementById("captureLeft").disabled = false;
+            document.getElementById("captureRight").disabled = true;
+        };
+
+        // Start the camera for the right side
+        document.getElementById("startRight").onclick = async function () {
+            currentSide = "right";
+            await startCamera();
+            document.getElementById("captureRight").disabled = false;
+            document.getElementById("captureLeft").disabled = true;
+        };
+
+        // Capture left frame
+        document.getElementById("captureLeft").onclick = function () {
+            captureFrame().then(frame => {
+                leftImageFile = frame;
+                alert("Left frame captured!");
+                checkFramesReady();
+            });
+        };
+
+        // Capture right frame
+        document.getElementById("captureRight").onclick = function () {
+            captureFrame().then(frame => {
+                rightImageFile = frame;
+                alert("Right frame captured!");
+                checkFramesReady();
+            });
+        };
+
+        // Generate result after both frames are captured
+        document.getElementById("generateResult").onclick = async function () {
+            if (!leftImageFile || !rightImageFile) {
+                alert("Please capture both frames before generating the result.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("left_frame", leftImageFile);
+            formData.append("right_frame", rightImageFile);
+
+            try {
+                const response = await axios.post("http://127.0.0.1:8000/upload-video/", formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data"
+                    }
+                });
+
+                // Update signal state display
+                const { left_signal, right_signal } = response.data;
+                document.getElementById("signal").innerHTML = `
+                    <p>Left Signal: ${left_signal}</p>
+                    <p>Right Signal: ${right_signal}</p>
+                `;
+            } catch (error) {
+                console.error("Error generating result:", error);
+                alert("An error occurred while generating the result.");
+            }
+        };
+
+        // Function to start the camera
+        async function startCamera() {
+            const video = document.getElementById("video");
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            document.getElementById("videoContainer").style.display = "block";
+        }
+
+        // Capture the current frame from the video
+        function captureFrame() {
+            return new Promise((resolve) => {
+                const video = document.getElementById("video");
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext("2d");
+                context.drawImage(video, 0, 0);
+                canvas.toBlob(blob => {
+                    resolve(new File([blob], `${currentSide}_frame.png`, { type: "image/png" }));
+                });
+            });
+        }
+
+        // Check if both frames are captured to enable the generate result button
+        function checkFramesReady() {
+            if (leftImageFile && rightImageFile) {
+                document.getElementById("generateResult").disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8 Video Object Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #result {
+            margin-top: 20px;
+        }
+        #uploadBtn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #uploadBtn:hover {
+            background-color: #45a049;
+        }
+        #uploadBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Upload Video for Object Detection</h2>
+
+    <input type="file" id="videoInput" accept="video/*">
+    <button id="uploadBtn">Upload and Detect</button>
+
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadBtn').addEventListener('click', async function() {
+            const videoInput = document.getElementById('videoInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const resultDiv = document.getElementById('result');
+
+            if (videoInput.files.length === 0) {
+                alert("Please select a video file.");
+                return;
+            }
+
+            // Set loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = "Loading...";
+
+            const formData = new FormData();
+            formData.append('file', videoInput.files[0]);
+
+            // Clear any previous results
+            resultDiv.innerHTML = '';
+
+            // Send the video to the FastAPI backend
+            try {
+                const response = await fetch('http://127.0.0.1:8000/upload-video/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error uploading the video');
+                }
+
+                const result = await response.json();
+
+                // Display the detected object counts
+                resultDiv.innerHTML = "<h3>Detected Objects:</h3>";
+
+                // Format the detected object counts
+                let objects = result.object_counts;
+                let resultHTML = "<ul>";
+                for (let object in objects) {
+                    resultHTML += `<li>${object}: ${objects[object]}</li>`;
+                }
+                resultHTML += "</ul>";
+
+                resultDiv.innerHTML += resultHTML;
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+            } finally {
+                // Restore the button's original state
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = "Upload and Detect";
+            }
+        });
+    </script>
+
+</body>
+</html>
